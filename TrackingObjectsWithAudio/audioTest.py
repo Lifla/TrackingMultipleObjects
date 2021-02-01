@@ -20,24 +20,37 @@ def get_audio():
         said = " "
 
         # print(sr.Microphone(device_index=25))
+        while True:
+            try:
+                audio = r.listen(source)
+                said = r.recognize_google(audio, language="ko-KR")
 
-        try:
-            said = r.recognize_google(audio)
+                text = said.lower()
+                print(text)
 
-        except Exception as e:
-            print("Exception: " + str(e))
+                if "안녕" in text:
+                    print("Hey!")
+                else:
+                    print("You shall not pass")
+
+            except Exception as e:
+                print("Exception: " + str(e))
 
     return said
 
 
 print("start")
-for index, name in enumerate(sr.Microphone.list_microphone_names()):
-    print("Microphone with name \"{1}\" found for `Microphone(device_index={0})`".format(index, name))
+# for index, name in enumerate(sr.Microphone.list_microphone_names()):
+#     print("Microphone with name \"{1}\" found for `Microphone(device_index={0})`".format(index, name))
 speak("hello")
-text = get_audio().lower()
-print(text)
 
-if "stony brook" in text:
-    print("shut up")
-else:
-    print("You shall not pass")
+get_audio().lower()
+# print(text)
+
+# while True:
+#     text = get_audio().lower()
+#     print(text)
+#     if "안녕" in text:
+#         print("Hey!")
+#     else:
+#         print("You shall not pass")

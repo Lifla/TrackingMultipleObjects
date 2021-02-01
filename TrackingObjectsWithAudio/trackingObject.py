@@ -1,11 +1,12 @@
 import cv2
 from adafruit_servokit import ServoKit
 import time
+import keyboard
 
 kit = ServoKit(channels=16)
 
 pan1 = 90
-tilt1 = 90
+tilt1 = 75
 pan2 = 90
 tilt2 = 90
 
@@ -20,6 +21,7 @@ height = 720
 
 cam1 = cv2.VideoCapture(0, cv2.CAP_V4L2)
 cam2 = cv2.VideoCapture(1, cv2.CAP_V4L2)
+cam3 = cv2.VideoCapture(2, cv2.CAP_V4L2)
 
 cam1.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 cam1.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -29,7 +31,11 @@ cam2.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 cam2.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 cam2.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10.0, (1280, 720))
+cam3.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+cam3.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+cam3.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
+# out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10.0, (1280, 720))
 
 # tracker_types = ['MOSSE', 'KCF', 'CSRT', 'BOOSTING', 'MIL', 'TLD', 'MEDIANFLOW', 'GOTURN']
 
@@ -41,6 +47,10 @@ tracker1 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
 # tracker2 = cv2.TrackerKCF_create()  # In the middle of CSRT and MOSSE
 tracker2 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
 
+# tracker3 = cv2.TrackerMOSSE_create()  # Faster than CSRT but less accurate
+# tracker3 = cv2.TrackerKCF_create()  # In the middle of CSRT and MOSSE
+# tracker3 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
+
 success1, img1 = cam1.read()
 bbox1 = cv2.selectROI("Tracking Object", img1, False)
 tracker1.init(img1, bbox1)
@@ -51,8 +61,10 @@ tracker2.init(img2, bbox2)
 
 flag1 = True
 flag2 = False
+flag3 = False
 count1 = 0
 count2 = 0
+count3 = 0
 
 
 def drawBox(img, bbox, camNum, pan, tilt):
@@ -119,6 +131,11 @@ while True:
     success2, img2 = cam2.read()
     success2, bbox2 = tracker2.update(img2)
 
+    success3, img3 = cam3.read()
+
+    # small_frame1 = cv2.resize(img1, (0, 0), fx=0.25, fy=0.25)
+    # small_frame2 = cv2.resize(img2, (0, 0), fx=0.25, fy=0.25)
+
     if success1:
         pan1, tilt1 = drawBox(img1, bbox1, 1, pan1, tilt1)
     else:
@@ -136,31 +153,70 @@ while True:
     cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
 
     cv2.imshow("Tracking Object", img1)
-    cv2.imshow("Tracking Object 2", img2)
+    # cv2.imshow("Tracking Object 2", img2)
+
+    if flag1:
+        cv2.putText(img1, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+        cv2.imshow("Tracking Object", img1)
+
+        # count1 = count1 + 1
+        # print(count1)
+        if count1 == 120:
+            count1 = 0
+            flag1 = False
+            flag2 = True
+            flag3 = False
+
+    elif flag2:
+        cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+        cv2.imshow("Tracking Object", img2)
+
+        # count2 = count2 + 1
+        # print(count2)
+        if count2 == 120:
+            count2 = 0
+            flag1 = False
+            flag2 = False
+            flag3 = True
+
+    elif flag3:
+        cv2.putText(img3, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+        cv2.imshow("Tracking Object", img3)
+
+        # count2 = count2 + 1
+        # print(count2)
+        if count2 == 120:
+            count2 = 0
+            flag1 = True
+            flag2 = False
+            flag3 = False
 
     # out.write(img1)
 
-    # if flag1:
-    #     cv2.putText(img1, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
-    #     cv2.imshow("Tracking Object", img1)
-
-    #     count1 = count1 + 1
-    #     # print(count1)
-    #     if count1 == 120:
-    #         count1 = 0
-    #         flag1 = False
-    #         flag2 = True
-
-    # if flag2:
-    #     cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
-    #     cv2.imshow("Tracking Object", img2)
-
-    #     count2 = count2 + 1
-    #     # print(count2)
-    #     if count2 == 120:
-    #         count2 = 0
-    #         flag1 = True
-    #         flag2 = False
+    # Switching camera source by keyboard
+    if keyboard.is_pressed('q'):
+        break
+    elif keyboard.is_pressed('1'):
+        flag1 = True
+        flag2 = False
+        flag3 = False
+        count1 = 0
+        count2 = 0
+        count3 = 0
+    elif keyboard.is_pressed('2'):
+        flag1 = False
+        flag2 = True
+        flag3 = False
+        count1 = 0
+        count2 = 0
+        count3 = 0
+    elif keyboard.is_pressed('3'):
+        flag1 = False
+        flag2 = False
+        flag3 = True
+        count1 = 0
+        count2 = 0
+        count3 = 0
 
     if cv2.waitKey(1) & 0xff == ord('q'):
         break
