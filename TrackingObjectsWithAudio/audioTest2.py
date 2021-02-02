@@ -61,11 +61,42 @@ q = queue.Queue()
 
 
 def audio_callback(indata, frames, time, status):
+    global plotdata
     """This is called (from a separate thread) for each audio block."""
     if status:
         print(status, file=sys.stderr)
     # Fancy indexing with mapping creates a (necessary!) copy:
-    q.put(indata[::args.downsample, mapping])
+    # q.put(indata[::args.downsample, mapping])
+    # print(indata[::args.downsample, mapping])
+    # shift = len(indata)
+    abs_samples = [abs(x) for x in indata]
+
+    # print(shift)
+    # print(plotdata.size, shift)
+    volume_data = [sum(abs_samples)[0] / len(abs_samples)]
+    # print(volume_data)
+    q.put(volume_data)
+
+    # update plotdata
+    shift = len(volume_data)
+    plotdata = np.roll(plotdata, -shift, axis=0)
+    plotdata[-shift:, :] = volume_data
+
+    cut_value = np.average(plotdata[-3:, :])
+    medium_shot_value = np.average(plotdata[-30:, :])
+
+    cut_detect = True if cut_value > 0.15 else False
+    medium_shot_detect = True if medium_shot_value > 0.07 else False
+
+    if cut_detect:
+        print('cut')
+        print(cut_value)
+    if medium_shot_detect:
+        print('medium shot')
+        print(medium_shot_value)
+    # print(cut_value, medium_shot_value)
+    # plotdata = np.roll(plotdata, -shift, axis=0)
+    # plotdata[-shift:, :] = indata
 
 
 def update_plot(frame):
@@ -81,9 +112,9 @@ def update_plot(frame):
             data = q.get_nowait()
         except queue.Empty:
             break
-        shift = len(data)
-        plotdata = np.roll(plotdata, -shift, axis=0)
-        plotdata[-shift:, :] = data
+        # shift = len(data)
+        # plotdata = np.roll(plotdata, -shift, axis=0)
+        # plotdata[-shift:, :] = data
     for column, line in enumerate(lines):
         line.set_ydata(plotdata[:, column])
     return lines
