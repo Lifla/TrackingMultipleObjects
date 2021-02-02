@@ -1,4 +1,3 @@
-from audioTest import audio_loop
 import cv2
 from adafruit_servokit import ServoKit
 import time
@@ -219,7 +218,6 @@ if __name__ == '__main__':
         try:
             print(conn.recv(1024).decode())
         except :
-            print('no msg')
             pass
         # Switching camera source by keyboard
         if keyboard.is_pressed('q'):
