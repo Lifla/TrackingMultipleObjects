@@ -3,6 +3,7 @@ from gtts import gTTS
 import os
 import time
 import playsound
+import socket
 
 
 def speak(text):
@@ -12,7 +13,7 @@ def speak(text):
     playsound.playsound(filename)
 
 
-def get_audio():
+def get_audio(sock):
     r = sr.Recognizer()
     print("test ready")
     with sr.Microphone() as source:
@@ -25,11 +26,11 @@ def get_audio():
                 audio = r.listen(source)
                 said = r.recognize_google(audio, language="ko-KR")
 
-                text = said.lower()
-                print(text)
+                print("in audio process: ", said)
 
-                if "안녕" in text:
+                if "안녕" in said:
                     print("Hey!")
+                    sock.sendall(said.encode())
                 else:
                     print("You shall not pass")
 
@@ -38,19 +39,24 @@ def get_audio():
 
     return said
 
+def audio_loop(sock):
+    print("start")
+    # for index, name in enumerate(sr.Microphone.list_microphone_names()):
+    #     print("Microphone with name \"{1}\" found for `Microphone(device_index={0})`".format(index, name))
+    speak("hello")
 
-print("start")
-# for index, name in enumerate(sr.Microphone.list_microphone_names()):
-#     print("Microphone with name \"{1}\" found for `Microphone(device_index={0})`".format(index, name))
-speak("hello")
+    get_audio(sock)
+    # print(text)
 
-get_audio().lower()
-# print(text)
+    # while True:
+    #     text = get_audio().lower()
+    #     print(text)
+    #     if "안녕" in text:
+    #         print("Hey!")
+    #     else:
+    #         print("You shall not pass")
 
-# while True:
-#     text = get_audio().lower()
-#     print(text)
-#     if "안녕" in text:
-#         print("Hey!")
-#     else:
-#         print("You shall not pass")
+if __name__ == '__main__':
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.connect('\0user.audio.test')
+        audio_loop(s)

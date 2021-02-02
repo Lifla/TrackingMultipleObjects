@@ -1,7 +1,10 @@
+from audioTest import audio_loop
 import cv2
 from adafruit_servokit import ServoKit
 import time
 import keyboard
+# from multiprocessing import Process, Queue
+import socket
 
 kit = ServoKit(channels=16)
 
@@ -122,105 +125,133 @@ def drawBox(img, bbox, camNum, pan, tilt):
 
     return pan, tilt
 
-while True:
-    timer = cv2.getTickCount()
+if __name__ == '__main__':
+    # audio_queue = Queue()
+    # audio_process = Process(target=audio_loop, args=(audio_queue,))
+    # audio_process.start()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.setblocking(0)
+    sock.bind('\0user.audio.test')
+    sock.listen(1)
+    print('waiting for audio program to connect...')
+    # conn = {}
+    # addr = ''
+    while True:
+        try:
+            conn, addr = sock.accept()
+            conn.setblocking(0)
+            break
+        except BlockingIOError:
+            pass
 
-    success1, img1 = cam1.read()
-    success1, bbox1 = tracker1.update(img1)
+    while True:
+        timer = cv2.getTickCount()
 
-    success2, img2 = cam2.read()
-    success2, bbox2 = tracker2.update(img2)
-
-    success3, img3 = cam3.read()
-
-    # small_frame1 = cv2.resize(img1, (0, 0), fx=0.25, fy=0.25)
-    # small_frame2 = cv2.resize(img2, (0, 0), fx=0.25, fy=0.25)
-
-    if success1:
-        pan1, tilt1 = drawBox(img1, bbox1, 1, pan1, tilt1)
-    else:
-        cv2.putText(img1, "Lost Target 1", (75, 75), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+        success1, img1 = cam1.read()
         success1, bbox1 = tracker1.update(img1)
 
-    if success2:
-        pan2, tilt2 = drawBox(img2, bbox2, 2, pan2, tilt2)
-    else:
-        cv2.putText(img2, "Lost Target 2", (75, 75), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+        success2, img2 = cam2.read()
         success2, bbox2 = tracker2.update(img2)
 
-    fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
-    cv2.putText(img1, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
-    cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+        success3, img3 = cam3.read()
 
-    cv2.imshow("Tracking Object", img1)
-    # cv2.imshow("Tracking Object 2", img2)
+        # small_frame1 = cv2.resize(img1, (0, 0), fx=0.25, fy=0.25)
+        # small_frame2 = cv2.resize(img2, (0, 0), fx=0.25, fy=0.25)
 
-    if flag1:
+        if success1:
+            pan1, tilt1 = drawBox(img1, bbox1, 1, pan1, tilt1)
+        else:
+            cv2.putText(img1, "Lost Target 1", (75, 75), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+
+        if success2:
+            pan2, tilt2 = drawBox(img2, bbox2, 2, pan2, tilt2)
+        else:
+            cv2.putText(img2, "Lost Target 2", (75, 75), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+
+        fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
         cv2.putText(img1, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
-        cv2.imshow("Tracking Object", img1)
-
-        # count1 = count1 + 1
-        # print(count1)
-        if count1 == 120:
-            count1 = 0
-            flag1 = False
-            flag2 = True
-            flag3 = False
-
-    elif flag2:
         cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
-        cv2.imshow("Tracking Object", img2)
 
-        # count2 = count2 + 1
-        # print(count2)
-        if count2 == 120:
-            count2 = 0
-            flag1 = False
-            flag2 = False
-            flag3 = True
+        cv2.imshow("Tracking Object", img1)
+        # cv2.imshow("Tracking Object 2", img2)
 
-    elif flag3:
-        cv2.putText(img3, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
-        cv2.imshow("Tracking Object", img3)
+        if flag1:
+            cv2.putText(img1, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.imshow("Tracking Object", img1)
 
-        # count2 = count2 + 1
-        # print(count2)
-        if count2 == 120:
-            count2 = 0
+            # count1 = count1 + 1
+            # print(count1)
+            if count1 == 120:
+                count1 = 0
+                flag1 = False
+                flag2 = True
+                flag3 = False
+
+        elif flag2:
+            cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.imshow("Tracking Object", img2)
+
+            # count2 = count2 + 1
+            # print(count2)
+            if count2 == 120:
+                count2 = 0
+                flag1 = False
+                flag2 = False
+                flag3 = True
+
+        elif flag3:
+            cv2.putText(img3, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+            cv2.imshow("Tracking Object", img3)
+
+            # count2 = count2 + 1
+            # print(count2)
+            if count2 == 120:
+                count2 = 0
+                flag1 = True
+                flag2 = False
+                flag3 = False
+
+        # out.write(img1)
+
+        # get audio
+        # if not audio_queue.empty():
+        #     print(audio_queue.get_nowait())
+        try:
+            print(conn.recv(1024).decode())
+        except :
+            print('no msg')
+            pass
+        # Switching camera source by keyboard
+        if keyboard.is_pressed('q'):
+            break
+        elif keyboard.is_pressed('1'):
             flag1 = True
             flag2 = False
             flag3 = False
+            count1 = 0
+            count2 = 0
+            count3 = 0
+        elif keyboard.is_pressed('2'):
+            flag1 = False
+            flag2 = True
+            flag3 = False
+            count1 = 0
+            count2 = 0
+            count3 = 0
+        elif keyboard.is_pressed('3'):
+            flag1 = False
+            flag2 = False
+            flag3 = True
+            count1 = 0
+            count2 = 0
+            count3 = 0
 
-    # out.write(img1)
-
-    # Switching camera source by keyboard
-    if keyboard.is_pressed('q'):
-        break
-    elif keyboard.is_pressed('1'):
-        flag1 = True
-        flag2 = False
-        flag3 = False
-        count1 = 0
-        count2 = 0
-        count3 = 0
-    elif keyboard.is_pressed('2'):
-        flag1 = False
-        flag2 = True
-        flag3 = False
-        count1 = 0
-        count2 = 0
-        count3 = 0
-    elif keyboard.is_pressed('3'):
-        flag1 = False
-        flag2 = False
-        flag3 = True
-        count1 = 0
-        count2 = 0
-        count3 = 0
-
-    if cv2.waitKey(1) & 0xff == ord('q'):
-        break
-
-cam1.release()
-cam2.release()
-cv2.destroyAllWindows()
+        if cv2.waitKey(1) & 0xff == ord('q'):
+            break
+    cam1.release()
+    cam2.release()
+    # audio_process.kill()
+    # audio_process.join()
+    conn.close()
+    sock.close()
+    cv2.destroyAllWindows()
