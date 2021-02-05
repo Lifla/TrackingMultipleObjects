@@ -7,6 +7,7 @@ Matplotlib and NumPy have to be installed.
 import argparse
 import queue
 import sys
+import socket
 
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
@@ -62,6 +63,8 @@ q = queue.Queue()
 
 def audio_callback(indata, frames, time, status):
     global plotdata
+    global connected
+    global sock
     """This is called (from a separate thread) for each audio block."""
     if status:
         print(status, file=sys.stderr)
@@ -82,20 +85,44 @@ def audio_callback(indata, frames, time, status):
     plotdata = np.roll(plotdata, -shift, axis=0)
     plotdata[-shift:, :] = volume_data
 
-    print(volume_data)
-
     cut_value = np.average(plotdata[-3:, :])
-    medium_shot_value = np.average(plotdata[-80:, :])
+    # medium_shot_value = np.average(plotdata[-30:, :])
 
-    cut_detect = True if cut_value > 0.15 else False
-    medium_shot_detect = True if medium_shot_value > 0.07 else False
+    cut_detect = True if cut_value > 0.11 else False
+    # medium_shot_detect = True if medium_shot_value > 0.07 else False
+
+    if not connected:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.setblocking(0)
+        try:
+            sock.connect('\0user.audio.test')
+            connected = True
+            print('connected to video server')
+        except ConnectionRefusedError:
+            pass
+        except BlockingIOError:
+            pass
 
     if cut_detect:
-        print('cut')
+        # print('cut')
         print(cut_value)
-    if medium_shot_detect:
-        print('medium shot')
-        print(medium_shot_value)
+        if connected:
+            try:
+                sock.sendall('cut'.encode())
+            except:
+                sock.close()
+                connected = False
+                print('disconnected from video server')
+    # if medium_shot_detect:
+    #     print('medium shot')
+    #     print(medium_shot_value)
+    #     if connected:
+    #         try:
+    #             sock.sendall('medium'.encode())
+    #         except:
+    #             sock.close()
+    #             connected = False
+    #             print('disconnected from video server')
     # print(cut_value, medium_shot_value)
     # plotdata = np.roll(plotdata, -shift, axis=0)
     # plotdata[-shift:, :] = indata
@@ -130,6 +157,10 @@ try:
     length = int(args.window * args.samplerate / (1000 * args.downsample))
     plotdata = np.zeros((length, len(args.channels)))
 
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.setblocking(0)
+    connected = False
+
     fig, ax = plt.subplots()
     lines = ax.plot(plotdata)
     if len(args.channels) > 1:
@@ -145,9 +176,12 @@ try:
     stream = sd.InputStream(
         device=args.device, channels=max(args.channels),
         samplerate=args.samplerate, callback=audio_callback)
-
-    ani = FuncAnimation(fig, update_plot, interval=args.interval, blit=True)
+    print(args.channels)
+    print(sd.query_devices())
+    # ani = FuncAnimation(fig, update_plot, interval=args.interval, blit=True)
     with stream:
-        plt.show()
+        while True:
+            pass
+        # plt.show()
 except Exception as e:
     parser.exit(type(e).__name__ + ': ' + str(e))

@@ -5,7 +5,7 @@ Matplotlib and NumPy have to be installed.
 
 """
 import argparse
-import queue
+# import queue
 import sys
 
 import numpy as np
@@ -55,30 +55,34 @@ args = parser.parse_args(remaining)
 if any(c < 1 for c in args.channels):
     parser.error('argument CHANNEL: must be >= 1')
 mapping = [c - 1 for c in args.channels]  # Channel numbers start with 1
-q = queue.Queue()
+# q = queue.Queue()
 
 
 def audio_callback(indata, frames, time, status):
     global plotdata
     global connected
+    global sock
     """This is called (from a separate thread) for each audio block."""
     # if status:
     #     print(status, file=sys.stderr)
     abs_samples = [abs(x) for x in indata]
 
     volume_data = [sum(abs_samples)[0] / len(abs_samples)]
-    q.put(volume_data)
+    # q.put(volume_data)
 
     # update plotdata
     shift = len(volume_data)
     plotdata = np.roll(plotdata, -shift, axis=0)
     plotdata[-shift:, :] = volume_data
 
-    cut_value = np.average(plotdata[-3:, :])
-    medium_shot_value = np.average(plotdata[-30:, :])
+    volume_norm = np.linalg.norm(indata)*10
+    print (volume_norm)
 
-    cut_detect = True if cut_value > 0.15 else False
-    medium_shot_detect = True if medium_shot_value > 0.07 else False
+    cut_value = np.average(plotdata[-3:, :])
+    # medium_shot_value = np.average(plotdata[-30:, :])
+
+    cut_detect = True if cut_value > 0.10 else False
+    # medium_shot_detect = True if medium_shot_value > 0.07 else False
 
     if not connected:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -102,16 +106,16 @@ def audio_callback(indata, frames, time, status):
                 sock.close()
                 connected = False
                 print('disconnected from video server')
-    if medium_shot_detect:
-        print('medium shot')
-        print(medium_shot_value)
-        if connected:
-            try:
-                sock.sendall('medium'.encode())
-            except:
-                sock.close()
-                connected = False
-                print('disconnected from video server')
+    # if medium_shot_detect:
+    #     print('medium shot')
+    #     print(medium_shot_value)
+    #     if connected:
+    #         try:
+    #             sock.sendall('medium'.encode())
+    #         except:
+    #             sock.close()
+    #             connected = False
+    #             print('disconnected from video server')
 
 
 try:
@@ -121,6 +125,8 @@ try:
 
     length = int(args.window * args.samplerate / (1000 * args.downsample))
     plotdata = np.zeros((length, len(args.channels)))
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.setblocking(0)
     connected = False
 
     stream = sd.InputStream(

@@ -1,5 +1,6 @@
 import cv2
 from adafruit_servokit import ServoKit
+import numpy as np
 import time
 import keyboard
 # from multiprocessing import Process, Queue
@@ -7,10 +8,10 @@ import socket
 
 kit = ServoKit(channels=16)
 
-pan1 = 90
-tilt1 = 75
-pan2 = 90
-tilt2 = 90
+pan1 = 97
+tilt1 = 70
+pan2 = 102
+tilt2 = 87
 
 kit.servo[0].angle = pan1
 kit.servo[1].angle = tilt1
@@ -41,13 +42,13 @@ cam3.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
 # tracker_types = ['MOSSE', 'KCF', 'CSRT', 'BOOSTING', 'MIL', 'TLD', 'MEDIANFLOW', 'GOTURN']
 
-# tracker1 = cv2.TrackerMOSSE_create()  # Faster than CSRT but less accurate
+tracker1 = cv2.TrackerMOSSE_create()  # Faster than CSRT but less accurate
 # tracker1 = cv2.TrackerKCF_create()  # In the middle of CSRT and MOSSE
-tracker1 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
+# tracker1 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
 
-# tracker2 = cv2.TrackerMOSSE_create()  # Faster than CSRT but less accurate
+tracker2 = cv2.TrackerMOSSE_create()  # Faster than CSRT but less accurate
 # tracker2 = cv2.TrackerKCF_create()  # In the middle of CSRT and MOSSE
-tracker2 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
+# tracker2 = cv2.TrackerCSRT_create()  # Slower than MOSSE but more accurate
 
 # tracker3 = cv2.TrackerMOSSE_create()  # Faster than CSRT but less accurate
 # tracker3 = cv2.TrackerKCF_create()  # In the middle of CSRT and MOSSE
@@ -61,17 +62,23 @@ success2, img2 = cam2.read()
 bbox2 = cv2.selectROI("Tracking Object", img2, False)
 tracker2.init(img2, bbox2)
 
-flag1 = True
+flag1 = False
 flag2 = False
-flag3 = False
+flag3 = True
 count1 = 0
 count2 = 0
 count3 = 0
+visit1 = 0
+
+pan1_samples = []
+tilt1_samples = []
+pan2_samples = []
+tilt2_samples = []
 
 
 def drawBox(img, bbox, camNum, pan, tilt):
     x, y, w, h = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-    cv2.rectangle(img, (x, y), ((x + w), (y + h)), (255, 0, 255), 3, 1)
+    cv2.rectangle(img, (x, y), ((x + w), (y + h)), (255, 0, 255), 2, 1)
     objX = x + (w / 2)
     objY = y + (h / 2)
     errorPan = objX - (width / 2)
@@ -79,9 +86,9 @@ def drawBox(img, bbox, camNum, pan, tilt):
 
     if camNum == 1:
         if abs(errorPan) > 15:
-            pan = pan + (errorPan / 250)
+            pan = pan + (errorPan / 550)
         if abs(errorTilt) > 15:
-            tilt = tilt - (errorTilt / 250)
+            tilt = tilt - (errorTilt / 550)
         if pan > 180:
             pan = 180
             print('Pan 1 Out of Range')
@@ -102,9 +109,9 @@ def drawBox(img, bbox, camNum, pan, tilt):
 
     elif camNum == 2:
         if abs(errorPan) > 15:
-            pan = pan + (errorPan / 250)
+            pan = pan + (errorPan / 700)
         if abs(errorTilt) > 15:
-            tilt = tilt - (errorTilt / 250)
+            tilt = tilt - (errorTilt / 700)
         if pan > 180:
             pan = 180
             print('Pan 2 Out of Range')
@@ -135,6 +142,7 @@ if __name__ == '__main__':
     print('waiting for audio program to connect...')
     # conn = {}
     # addr = ''
+
     while True:
         try:
             conn, addr = sock.accept()
@@ -172,53 +180,121 @@ if __name__ == '__main__':
         cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
 
         cv2.imshow("Tracking Object", img1)
-        # cv2.imshow("Tracking Object 2", img2)
 
+        pan1_samples.append(pan1)
+        tilt1_samples.append(tilt1)
+        pan2_samples.append(pan2)
+        tilt2_samples.append(tilt2)
+
+        msg = ''
+
+        try:
+            msg = conn.recv(1024).decode()
+        except :
+            pass
+
+        # Cam 1 tracking and following human
         if flag1:
             cv2.putText(img1, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
             cv2.imshow("Tracking Object", img1)
 
-            # count1 = count1 + 1
-            # print(count1)
-            if count1 == 120:
-                count1 = 0
+            if len(pan2_samples) > 250 and (abs(pan2_samples[-250] - pan2_samples[-1]) > 6 or abs(tilt2_samples[-250] - tilt2_samples[-1]) > 6):
+                # cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+                # cv2.imshow("Tracking Object", img2)
+
                 flag1 = False
                 flag2 = True
                 flag3 = False
+                pan2_samples = []
 
+            if len(pan1_samples) > 250 and (abs(pan1_samples[-250] - pan1_samples[-1]) > 17 or abs(tilt1_samples[-250] - tilt1_samples[-1]) > 17):
+                # cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+                # cv2.imshow("Tracking Object", img2)
+
+                flag1 = False
+                flag2 = False
+                flag3 = True
+                pan1_samples = []
+
+            count1 = count1 + 1
+            
+            if msg == 'cut' and count1 > 60:
+                # print("msg is: ", msg, ". Switch to Cam 2")
+                flag1 = False
+                flag2 = True
+                flag3 = False
+                pan2_samples = []
+                count1 = 0
+
+            # count1 = count1 + 1
+            # print(count1)
+            # if count1 == 120:
+            #     count1 = 0
+            #     flag1 = False
+            #     flag2 = True
+            #     flag3 = False
+
+        # Close-up camera
         elif flag2:
             cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
             cv2.imshow("Tracking Object", img2)
 
+            if len(pan2_samples) > 250 and (abs(pan2_samples[-250] - pan2_samples[-1]) > 6 or abs(tilt2_samples[-250] - tilt2_samples[-1]) > 6):
+                # cv2.putText(img2, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
+                # cv2.imshow("Tracking Object", img2)
+                
+                flag1 = True
+                flag2 = False
+                flag3 = False
+                pan2_samples = []
+                visit1 = visit1 + 1
+                count2 = 0
+
+            count2 = count2 + 1
+            # print(count2)
+
+            if visit1 > 1 and count2 > 150:
+                # print("Time to switch to Cam 1")
+                flag1 = True
+                flag2 = False
+                flag3 = False
+                pan2_samples = []
+                count1 = 0
+                count2 = 0
+
             # count2 = count2 + 1
             # print(count2)
-            if count2 == 120:
-                count2 = 0
-                flag1 = False
-                flag2 = False
-                flag3 = True
+            # if count2 == 120:
+            #     count2 = 0
+            #     flag1 = False
+            #     flag2 = False
+            #     flag3 = True
 
+        # Wide camera
         elif flag3:
             cv2.putText(img3, str(int(fps)), (75, 50), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 2)
             cv2.imshow("Tracking Object", img3)
 
-            # count2 = count2 + 1
-            # print(count2)
-            if count2 == 120:
-                count2 = 0
+            if msg == 'cut':
+                # print("msg is: ", msg, ". Switch to Cam 1")
                 flag1 = True
                 flag2 = False
                 flag3 = False
+                pan2_samples = []
+                visit1 = visit1 + 1
 
-        # out.write(img1)
+            # count2 = count2 + 1
+            # print(count2)
+            # if count3 == 120:
+            #     count3 = 0
+            #     flag1 = True
+            #     flag2 = False
+            #     flag3 = False
 
         # get audio
         # if not audio_queue.empty():
         #     print(audio_queue.get_nowait())
-        try:
-            print(conn.recv(1024).decode())
-        except :
-            pass
+
         # Switching camera source by keyboard
         if keyboard.is_pressed('q'):
             break
@@ -246,8 +322,11 @@ if __name__ == '__main__':
 
         if cv2.waitKey(1) & 0xff == ord('q'):
             break
+
+
     cam1.release()
     cam2.release()
+    cam3.release()
     # audio_process.kill()
     # audio_process.join()
     conn.close()
